@@ -51,9 +51,8 @@ variable "tags" {
 
 variable "admin_ips" {
   description = "List of CIDR admin IPs"
-  type = "list"
+  type        = "list"
 }
-
 
 ////////////////////////////////////////////
 /////////////// END VARIABLES //////////////
@@ -91,10 +90,10 @@ data "aws_subnet_ids" "default_subnets" {
 // or drop a modules it is easier to change just the local variable instead
 // of all other references
 locals {
-  key_name = "${aws_key_pair.deployer.key_name}"
-  vpc_id = "${data.aws_vpc.default.id}"
+  key_name     = "${aws_key_pair.deployer.key_name}"
+  vpc_id       = "${data.aws_vpc.default.id}"
   subnet_range = "${data.aws_vpc.default.cidr_block}"
-  subnet_ids = ["${data.aws_subnet_ids.default_subnets.ids}"]
+  subnet_ids   = ["${data.aws_subnet_ids.default_subnets.ids}"]
 }
 
 // Firewall. Create policies for instances and load balancers.
@@ -117,10 +116,10 @@ module "dcos-security-groups" {
 // or drop a modules it is easier to change just the local variable instead
 // of all other references
 locals {
-  instance_security_groups = ["${list(module.dcos-security-groups.internal, module.dcos-security-groups.admin)}"]
-  security_groups_elb_masters = ["${list(module.dcos-security-groups.admin,module.dcos-security-groups.internal)}"]
+  instance_security_groups             = ["${list(module.dcos-security-groups.internal, module.dcos-security-groups.admin)}"]
+  security_groups_elb_masters          = ["${list(module.dcos-security-groups.admin,module.dcos-security-groups.internal)}"]
   security_groups_elb_masters_internal = ["${list(module.dcos-security-groups.internal)}"]
-  security_groups_elb_public_agents = ["${list(module.dcos-security-groups.admin,module.dcos-security-groups.internal)}"]
+  security_groups_elb_public_agents    = ["${list(module.dcos-security-groups.admin,module.dcos-security-groups.internal)}"]
 }
 
 // Permissions creates instances profiles so you could use Rexray and Kubernetes with AWS support
@@ -232,13 +231,13 @@ locals {
   master_ips         = ["${module.dcos-master-instances.public_ips}"]
   master_private_ips = ["${module.dcos-master-instances.private_ips}"]
   masters_os_user    = "${module.dcos-master-instances.os_user}"
-  master_instances = ["${module.dcos-master-instances.instances}"]
+  master_instances   = ["${module.dcos-master-instances.instances}"]
 
   private_agent_ips      = ["${module.dcos-privateagent-instances.public_ips}"]
   private_agents_os_user = "${module.dcos-privateagent-instances.os_user}"
 
-  public_agent_ips      = ["${module.dcos-publicagent-instances.public_ips}"]
-  public_agents_os_user = "${module.dcos-publicagent-instances.os_user}"
+  public_agent_ips       = ["${module.dcos-publicagent-instances.public_ips}"]
+  public_agents_os_user  = "${module.dcos-publicagent-instances.os_user}"
   public_agent_instances = ["${module.dcos-publicagent-instances.instances}"]
 }
 
@@ -269,10 +268,10 @@ module "dcos-elb" {
   security_groups_masters          = ["${local.security_groups_elb_masters}"]
   security_groups_masters_internal = ["${local.security_groups_elb_masters_internal}"]
   security_groups_public_agents    = ["${local.security_groups_elb_public_agents}"]
-  
-  master_instances                 = ["${local.master_instances}"]
 
-  public_agent_instances           = ["${local.public_agent_instances}"]
+  master_instances = ["${local.master_instances}"]
+
+  public_agent_instances = ["${local.public_agent_instances}"]
 
   tags = "${var.tags}"
 }
@@ -317,9 +316,9 @@ module "dcos-install" {
   num_public_agents     = "${var.num_public_agents}"
 
   # DC/OS options
-  dcos_install_mode         = "install"
-  dcos_cluster_name         = "${var.cluster_name}"
-  dcos_version              = "${var.dcos_version}"
+  dcos_install_mode = "install"
+  dcos_cluster_name = "${var.cluster_name}"
+  dcos_version      = "${var.dcos_version}"
 
   dcos_ip_detect_public_contents = <<EOF
 #!/bin/sh
@@ -357,4 +356,3 @@ output "elb.masters_dns_name" {
   description = "This is the load balancer address to access the DC/OS UI"
   value       = "${local.elb_masters_dns_name}"
 }
-
