@@ -51,6 +51,7 @@ variable "tags" {
 
 variable "admin_ips" {
   description = "List of CIDR admin IPs"
+  type = "list"
 }
 
 
@@ -62,6 +63,8 @@ provider "aws" {}
 
 // create a ssh-key-pair.
 resource "aws_key_pair" "deployer" {
+  provider = "aws"
+
   key_name   = "${var.cluster_name}-deployer-key"
   public_key = "${var.ssh_public_key}"
 }
@@ -70,6 +73,8 @@ resource "aws_key_pair" "deployer" {
 // instead of default you could specify an name or ID. 
 // https://www.terraform.io/docs/providers/aws/d/vpc.html
 data "aws_vpc" "default" {
+  provider = "aws"
+
   default = true
 }
 
@@ -77,7 +82,19 @@ data "aws_vpc" "default" {
 // You could use tags if you only want a subset of subnets
 // https://www.terraform.io/docs/providers/aws/d/subnet_ids.html
 data "aws_subnet_ids" "default_subnets" {
+  provider = "aws"
+
   vpc_id = "${data.aws_vpc.default.id}"
+}
+
+// we use intermediate local variables. So whenever it is needed to replace
+// or drop a modules it is easier to change just the local variable instead
+// of all other references
+locals {
+  key_name = "${aws_key_pair.deployer.key_name}"
+  vpc_id = "${data.aws_vpc.default.id}"
+  subnet_range = "${data.aws_vpc.default.cidr_block}"
+  subnet_ids = ["${data.aws_subnet_ids.default_subnets.ids}"]
 }
 
 // Firewall. Create policies for instances and load balancers.
@@ -90,10 +107,20 @@ module "dcos-security-groups" {
     aws = "aws"
   }
 
-  vpc_id       = "${data.aws_vpc.default.id}"
-  subnet_range = "${data.aws_vpc.default.cidr_block}"
+  vpc_id       = "${local.vpc_id}"
+  subnet_range = "${local.subnet_range}"
   cluster_name = "${var.cluster_name}"
   admin_ips    = ["${var.admin_ips}"]
+}
+
+// we use intermediate local variables. So whenever it is needed to replace
+// or drop a modules it is easier to change just the local variable instead
+// of all other references
+locals {
+  instance_security_groups = ["${list(module.dcos-security-groups.internal, module.dcos-security-groups.admin)}"]
+  security_groups_elb_masters = ["${list(module.dcos-security-groups.admin,module.dcos-security-groups.internal)}"]
+  security_groups_elb_masters_internal = ["${list(module.dcos-security-groups.internal)}"]
+  security_groups_elb_public_agents = ["${list(module.dcos-security-groups.admin,module.dcos-security-groups.internal)}"]
 }
 
 // Permissions creates instances profiles so you could use Rexray and Kubernetes with AWS support
@@ -123,9 +150,9 @@ module "dcos-bootstrap-instance" {
 
   cluster_name = "${var.cluster_name}"
 
-  aws_subnet_ids         = ["${data.aws_subnet_ids.default_subnets.ids}"]
-  aws_security_group_ids = ["${list(module.dcos-security-groups.internal, module.dcos-security-groups.admin)}"]
-  aws_key_name           = "${aws_key_pair.deployer.key_name}"
+  aws_subnet_ids         = ["${local.subnet_ids}"]
+  aws_security_group_ids = ["${local.instance_security_groups}"]
+  aws_key_name           = "${local.key_name}"
 
   tags = "${var.tags}"
 }
@@ -142,9 +169,9 @@ module "dcos-master-instances" {
 
   cluster_name = "${var.cluster_name}"
 
-  aws_subnet_ids         = ["${data.aws_subnet_ids.default_subnets.ids}"]
-  aws_security_group_ids = ["${list(module.dcos-security-groups.internal, module.dcos-security-groups.admin)}"]
-  aws_key_name           = "${aws_key_pair.deployer.key_name}"
+  aws_subnet_ids         = ["${local.subnet_ids}"]
+  aws_security_group_ids = ["${local.instance_security_groups}"]
+  aws_key_name           = "${local.key_name}"
 
   num_masters = "${var.num_masters}"
 
@@ -163,9 +190,9 @@ module "dcos-privateagent-instances" {
 
   cluster_name = "${var.cluster_name}"
 
-  aws_subnet_ids         = ["${data.aws_subnet_ids.default_subnets.ids}"]
-  aws_security_group_ids = ["${list(module.dcos-security-groups.internal, module.dcos-security-groups.admin)}"]
-  aws_key_name           = "${aws_key_pair.deployer.key_name}"
+  aws_subnet_ids         = ["${local.subnet_ids}"]
+  aws_security_group_ids = ["${local.instance_security_groups}"]
+  aws_key_name           = "${local.key_name}"
 
   num_private_agents = "${var.num_private_agents}"
 
@@ -184,14 +211,35 @@ module "dcos-publicagent-instances" {
 
   cluster_name = "${var.cluster_name}"
 
-  aws_subnet_ids         = ["${data.aws_subnet_ids.default_subnets.ids}"]
-  aws_security_group_ids = ["${list(module.dcos-security-groups.internal, module.dcos-security-groups.admin)}"]
-  aws_key_name           = "${aws_key_pair.deployer.key_name}"
+  aws_subnet_ids         = ["${local.subnet_ids}"]
+  aws_security_group_ids = ["${local.instance_security_groups}"]
+  aws_key_name           = "${local.key_name}"
   tags                   = "${var.tags}"
 
   num_public_agents = "${var.num_public_agents}"
 
   tags = "${var.tags}"
+}
+
+// we use intermediate local variables. So whenever it is needed to replace
+// or drop a modules it is easier to change just the local variable instead
+// of all other references
+locals {
+  bootstrap_ip         = "${module.dcos-bootstrap-instance.public_ip}"
+  bootstrap_private_ip = "${module.dcos-bootstrap-instance.private_ip}"
+  bootstrap_os_user    = "${module.dcos-bootstrap-instance.os_user}"
+
+  master_ips         = ["${module.dcos-master-instances.public_ips}"]
+  master_private_ips = ["${module.dcos-master-instances.private_ips}"]
+  masters_os_user    = "${module.dcos-master-instances.os_user}"
+  master_instances = ["${module.dcos-master-instances.instances}"]
+
+  private_agent_ips      = ["${module.dcos-privateagent-instances.public_ips}"]
+  private_agents_os_user = "${module.dcos-privateagent-instances.os_user}"
+
+  public_agent_ips      = ["${module.dcos-publicagent-instances.public_ips}"]
+  public_agents_os_user = "${module.dcos-publicagent-instances.os_user}"
+  public_agent_instances = ["${module.dcos-publicagent-instances.instances}"]
 }
 
 // Load balancers is providing three load balancers.
@@ -218,13 +266,22 @@ module "dcos-elb" {
   cluster_name = "${var.cluster_name}"
   subnet_ids   = ["${data.aws_subnet_ids.default_subnets.ids}"]
 
-  security_groups_masters          = ["${list(module.dcos-security-groups.admin,module.dcos-security-groups.internal)}"]
-  security_groups_masters_internal = ["${list(module.dcos-security-groups.internal)}"]
-  security_groups_public_agents    = ["${list(module.dcos-security-groups.admin,module.dcos-security-groups.internal)}"]
-  master_instances                 = ["${module.dcos-master-instances.instances}"]
-  public_agent_instances           = ["${module.dcos-publicagent-instances.instances}"]
+  security_groups_masters          = ["${local.security_groups_elb_masters}"]
+  security_groups_masters_internal = ["${local.security_groups_elb_masters_internal}"]
+  security_groups_public_agents    = ["${local.security_groups_elb_public_agents}"]
+  
+  master_instances                 = ["${local.master_instances}"]
+
+  public_agent_instances           = ["${local.public_agent_instances}"]
 
   tags = "${var.tags}"
+}
+
+// we use intermediate local variables. So whenever it is needed to replace
+// or drop a modules it is easier to change just the local variable instead
+// of all other references
+locals {
+  elb_masters_dns_name = "${module.dcos-elb.masters_dns_name}"
 }
 
 // DC/OS Install module takes a list of public and private ip addresses of each of the node type to install.
@@ -239,24 +296,24 @@ module "dcos-install" {
   version = "~> 0.0"
 
   # bootstrap
-  bootstrap_ip         = "${module.dcos-bootstrap-instance.public_ip}"
-  bootstrap_private_ip = "${module.dcos-bootstrap-instance.private_ip}"
-  bootstrap_os_user    = "${module.dcos-bootstrap-instance.os_user}"
+  bootstrap_ip         = "${local.bootstrap_ip}"
+  bootstrap_private_ip = "${local.bootstrap_private_ip}"
+  bootstrap_os_user    = "${local.bootstrap_os_user}"
 
   # master
-  master_ips         = ["${module.dcos-master-instances.public_ips}"]
-  master_private_ips = ["${module.dcos-master-instances.private_ips}"]
-  masters_os_user    = "${module.dcos-master-instances.os_user}"
+  master_ips         = ["${local.master_ips}"]
+  master_private_ips = ["${local.master_private_ips}"]
+  masters_os_user    = "${local.masters_os_user}"
   num_masters        = "${var.num_masters}"
 
   # private agent
-  private_agent_ips      = ["${module.dcos-privateagent-instances.public_ips}"]
-  private_agents_os_user = "${module.dcos-privateagent-instances.os_user}"
+  private_agent_ips      = ["${local.private_agent_ips}"]
+  private_agents_os_user = "${local.private_agents_os_user}"
   num_private_agents     = "${var.num_private_agents}"
 
   # public agent
-  public_agent_ips      = ["${module.dcos-publicagent-instances.public_ips}"]
-  public_agents_os_user = "${module.dcos-publicagent-instances.os_user}"
+  public_agent_ips      = ["${local.public_agent_ips}"]
+  public_agents_os_user = "${local.public_agents_os_user}"
   num_public_agents     = "${var.num_public_agents}"
 
   # DC/OS options
@@ -298,6 +355,6 @@ EOF
 
 output "elb.masters_dns_name" {
   description = "This is the load balancer address to access the DC/OS UI"
-  value       = "${module.dcos-elb.masters_dns_name}"
+  value       = "${local.elb_masters_dns_name}"
 }
 
