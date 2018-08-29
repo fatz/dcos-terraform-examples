@@ -82,11 +82,11 @@ resource "aws_key_pair" "deployer" {
 data "aws_vpc" "default" {
   provider = "aws"
 
-  default = false # or false if not default and use either id or tags below
+  default = true # or false if not default and use either id or tags below
   #id = ""
-  tags {
-    Name = "test-private-vpc"
-  }
+  #tags {
+    #Name = "test-private-vpc"
+  #}
 }
 
 // we want to use all the subnets in this VPC
@@ -96,11 +96,10 @@ data "aws_subnet_ids" "default_subnets" {
   provider = "aws"
 
   vpc_id = "${data.aws_vpc.default.id}"
-  
-  tags {
-    Name = "test-private-vpc-subnet"
-  }
-
+  #id = ""
+  #tags {
+    #Name = "test-private-vpc-subnet"
+  #}
 }
 
 // we use intermediate local variables. So whenever it is needed to replace

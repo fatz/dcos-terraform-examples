@@ -2,7 +2,9 @@
 In this example we will create an DC/OS cluster using an already existing VPC which uses Private Subnets. The `main.tf` file in this repository is our example implementation using a VPC with Private Subnets. In this example we do not allow any Public IP address associtation with any resource.
 
 # [`main.tf`](./main.tf?raw=1)
-Just do an copy of [`main.tf`](./main.tf?raw=1) in a local folder and `cd` into it.
+Just do an copy of [`main.tf`](./main.tf?raw=1) in a local folder and `cd` into it. 
+
+* NOTE: 
 
 # `cluster.tfvars`
 For this cluster we need to set your ssh public key..
@@ -25,6 +27,34 @@ $ echo "admin_ips=[\"1.2.3.0/24\", \"3.2.1.0/24\"]" >> cluster.tfvars
 $ echo "tags={Owner = \"$(whoami)\", Expires = \"2h\"}" >> cluster.tfvars
 ```
 
+## Setting VPC/Subnets
+Out of the box, this example uses the default VPC and all of the subnets from that VPC. You may modify these entries to specific "id" or by using Tags to specify. Examples are commented our in the main.tf. See example below for using tags:
+
+```bash
+# instead of default you could specify an ID or Tags. 
+# https://www.terraform.io/docs/providers/aws/d/vpc.html
+data "aws_vpc" "default" {
+  provider = "aws"
+
+  default = false # or false if not default and use either id or tags below
+  #id = ""        # If false you can use specific ID of VPC OR use tags 
+  tags {
+    Name = "test-private-vpc"
+  }
+}
+
+# You could use tags if you only want a subset of subnets such as a subnet with only Private Subnet
+# https://www.terraform.io/docs/providers/aws/d/subnet_ids.html
+data "aws_subnet_ids" "default_subnets" {
+  provider = "aws"
+
+  vpc_id = "${data.aws_vpc.default.id}" 
+  #id = "[]"        # You can use the Specific ID(s) OR use tags
+  tags {
+    Name = "test-private-vpc-subnet"
+  }
+}
+```
 
 ## Local Variables
 We've added intermediate local variables for all module output and inputs. This will make it easy replacing parts of the modules with your own code.
