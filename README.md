@@ -9,6 +9,7 @@ This repository contains example deployments of DC/OS using multiple features or
     - [Using a default/own VPC](./aws/default-vpc)
     - [No public IPs](./aws/private-subnets)
     - [Using Core OS](./aws/cores)
+    - [Custom DC/OS Cluster Configs](./aws/custom-configs)
 - GCP
 - Azure
 - On-Prem
