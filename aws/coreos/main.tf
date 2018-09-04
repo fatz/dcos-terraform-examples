@@ -19,13 +19,12 @@ module "dcos" {
   ssh_public_key = "${var.ssh_public_key}"
 
   num_masters = "3"
-  num_private_agents = "7"
+  num_private_agents = "3"
   num_public_agents = "1"
 
   dcos_type = "open"
   dcos_instance_os = "${var.dcos_instance_os}"
-  dcos_version = "1.11.4"
-  dcos_install_mode = "install"
+
   
   # dcos_license_key_contents = ""
 }
