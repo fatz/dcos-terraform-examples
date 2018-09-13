@@ -10,7 +10,7 @@ This repository contains example deployments of DC/OS using multiple features or
     - [No public IPs](./aws/private-subnets)
     - [Using Core OS](./aws/cores)
     - [Custom DC/OS Cluster Configs](./aws/custom-configs)
-    - [DC/OS Version Upgrades](./aws/upgrades)
+    - [DC/OS Version Upgrades](./aws/upgrade)
 - GCP
 - Azure
 - On-Prem
